@@ -1,60 +1,116 @@
 package com.example.schoters.ui.view.fragment
 
 import android.os.Bundle
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.SearchView
+import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import com.example.schoters.R
+import com.example.schoters.data.remote.model.GetNewsResponse
+import com.example.schoters.databinding.FragmentHomeBinding
+import com.example.schoters.ui.view.adapter.NewsApiAdapter
+import com.example.schoters.ui.viewmodel.NewssViewModel
+import com.example.schoters.utils.Status
+import kotlinx.android.synthetic.main.fragment_home.*
+import org.koin.androidx.viewmodel.ext.android.viewModel
 
-// TODO: Rename parameter arguments, choose names that match
-// the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-private const val ARG_PARAM1 = "param1"
-private const val ARG_PARAM2 = "param2"
 
-/**
- * A simple [Fragment] subclass.
- * Use the [HomeFragment.newInstance] factory method to
- * create an instance of this fragment.
- */
-class HomeFragment : Fragment() {
-    // TODO: Rename and change types of parameters
-    private var param1: String? = null
-    private var param2: String? = null
+class HomeFragment : Fragment(R.layout.fragment_home) {
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        arguments?.let {
-            param1 = it.getString(ARG_PARAM1)
-            param2 = it.getString(ARG_PARAM2)
-        }
+    companion object {
+        const val apiKey = "f1e5a792cea444b58f25ee7a9dc0d245"
     }
+
+    private lateinit var rvNews: RecyclerView
+    private val homeViewModel: NewssViewModel by viewModel()
+    private lateinit var newsAdater: NewsApiAdapter
+
+    private var _binding: FragmentHomeBinding? = null
+    private val binding get() = _binding!!
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_home, container, false)
+    ): View {
+        _binding = FragmentHomeBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
-    companion object {
-        /**
-         * Use this factory method to create a new instance of
-         * this fragment using the provided parameters.
-         *
-         * @param param1 Parameter 1.
-         * @param param2 Parameter 2.
-         * @return A new instance of fragment HomeFragment.
-         */
-        // TODO: Rename and change types and number of parameters
-        @JvmStatic
-        fun newInstance(param1: String, param2: String) =
-            HomeFragment().apply {
-                arguments = Bundle().apply {
-                    putString(ARG_PARAM1, param1)
-                    putString(ARG_PARAM2, param2)
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        observeHome()
+        setupRecycler()
+
+        binding.searchBar.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                search_bar.clearFocus()
+                homeViewModel.getNewss(query!!, apiKey)
+                return true
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                if (newText!!.isNotEmpty()) {
+                    homeViewModel.getNewss(newText, apiKey)
+                    homeViewModel.getNews.observe(viewLifecycleOwner) { response ->
+
+                    }
+                }
+                return true
+            }
+        })
+    }
+
+    private fun observeHome() {
+        homeViewModel.getNews.observe(viewLifecycleOwner) {
+            when (it.status) {
+                Status.LOADING -> {
+                    binding.PBSearch.visibility = View.VISIBLE
+                }
+                Status.SUCCESS -> {
+                    it.data?.let {
+                        binding.PBSearch.visibility = View.GONE
+                        newsAdater.submitData(listOf(it))
+                    }
+                    if (it.data!!.status.isNullOrEmpty()) {
+                        binding.displayDefault.visibility = View.VISIBLE
+                    } else {
+                        binding.displayDefault.visibility = View.GONE
+                    }
+                    binding.PBSearch.visibility = View.GONE
+                }
+                Status.ERROR -> {
+                    binding.PBSearch.visibility = View.GONE
+                    binding.displayDefault.visibility = View.GONE
                 }
             }
+        }
+    }
+
+    private fun setupRecycler() {
+
+        newsAdater = NewsApiAdapter()
+        rvNews = binding.rvSearchResult
+        rvNews.setHasFixedSize(true)
+        rvNews.layoutManager = StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
+        newsAdater.setOnItemClickCallback(object : NewsApiAdapter.OnItemClickCallback {
+            override fun onItemClicked(data: GetNewsResponse) {
+                findNavController().navigate(
+                    HomeFragmentDirections.actionHomeFragmentToDetailFragment(
+                        data.status.toString()
+                    )
+                )
+            }
+        })
+        rvNews.adapter = newsAdater
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        _binding = null
     }
 }

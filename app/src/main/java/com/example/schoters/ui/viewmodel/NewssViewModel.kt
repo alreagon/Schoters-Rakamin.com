@@ -18,7 +18,7 @@ class NewssViewModel(
     val getNews: LiveData<Resource<GetNewsResponse>>
         get() = _getNews
 
-    fun getNews(keyword: String, apiKey : String) {
+    fun getNewss(keyword: String, apiKey : String) {
         viewModelScope.launch {
             if (networkHelper.isNetworkConnected()) {
                 try {
